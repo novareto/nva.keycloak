@@ -43,6 +43,7 @@ class Health(Service):
         return self
 
     def render(self):
+        print('Health-Check')
         try:
             return
         except:
@@ -63,6 +64,7 @@ class KeyCloakUsers(Service):
         return self
 
     def render(self):
+        print('KeyCloakUsers')
         if not self.params:
             print('ListUsers')
             retlist = []
