@@ -6,33 +6,16 @@
 nva.keycloak
 ============
 
-Tell me what your product does
+Dieses AddOn für das CMS Plone implementiert den API-Contract für das Service Provider Interface (SPI) von Nico Köbler. 
 
 Features
 --------
 
-- Can be bullet points
-
-
-Examples
---------
-
-This add-on can be seen in action at the following sites:
-- Is there a page on the internet where everybody can see the features?
-
-
-Documentation
--------------
-
-Full documentation for end users can be found in the "docs" folder, and is also available online at http://docs.plone.org/foo/bar
-
-
-Translations
-------------
-
-This product has been translated into
-
-- Klingon (thanks, K'Plai)
+- Health-Check
+- Create User
+- Update User
+- Check Credentials
+- Update Credentials
 
 
 Installation
@@ -54,19 +37,16 @@ and then running ``bin/buildout``
 Contribute
 ----------
 
-- Issue Tracker: https://github.com/collective/nva.keycloak/issues
-- Source Code: https://github.com/collective/nva.keycloak
-- Documentation: https://docs.plone.org/foo/bar
+- Issue Tracker: https://github.com/novareto/nva.keycloak/issues
+- Source Code: https://github.com/novareto/nva.keycloak
 
 
 Support
 -------
 
-If you are having issues, please let us know.
-We have a mailing list located at: project@example.com
-
+Lars Walther (lwalther@novareto.de)
 
 License
 -------
 
-The project is licensed under the GPLv2.
+The project is licensed under the MIT.
