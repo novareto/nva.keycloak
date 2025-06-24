@@ -14,7 +14,7 @@ long_description = '\n\n'.join([
 
 setup(
     name='nva.keycloak',
-    version='1.0',
+    version='1.1.dev0',
     description="Keycloak SPI for Plone",
     long_description=long_description,
     # Get more from https://pypi.org/classifiers/
