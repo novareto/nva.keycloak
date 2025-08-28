@@ -2,10 +2,11 @@ Changelog
 =========
 
 
-1.1 (unreleased)
+1.1 (2025-08-28)
 ----------------
 
-- Nothing changed yet.
+- Python-Version
+- accept direktive in zcml für alle Services entfernt
 
 
 1.0 (2025-06-24)
