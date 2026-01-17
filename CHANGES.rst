@@ -2,10 +2,10 @@ Changelog
 =========
 
 
-1.1 (unreleased)
-----------------
+1.0.1 (2026-01-17)
+------------------
 
-- Nothing changed yet.
+- Aktualisierung der Python-Version
 
 
 1.0 (2025-06-24)
