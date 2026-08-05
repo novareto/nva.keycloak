@@ -14,6 +14,6 @@ class TestSetupUninstall:
 
     def test_browserlayer_not_registered(self, browser_layers):
         """Test that IBrowserLayer is not registered."""
-        from nva.keycloak.interfaces import IBrowserLayer
+        from nva.keycloak.interfaces import INvaKeycloakLayer
 
-        assert IBrowserLayer not in browser_layers
+        assert INvaKeycloakLayer not in browser_layers

@@ -1,298 +1,271 @@
+import json
+import logging
+import secrets
+
 from plone import api
 from plone.rest import Service
 from Products.CMFCore.utils import getToolByName
 from zope.interface import implementer
 from zope.publisher.interfaces import IPublishTraverse
 
-import json
+
+logger = logging.getLogger(__name__)
+MAX_PAGE_SIZE = 1000
+MAX_OFFSET = 1_000_000
 
 
 def createUser(uid, pw, email="john.doe@dummy.de", fullname="John Doe"):
-    props = {"fullname": fullname}
-    print("----")
-    print(uid)
-    user = api.user.create(email=email, username=uid, password=pw, properties=props)
-    return user
+    return api.user.create(
+        email=email,
+        username=uid,
+        password=pw,
+        properties={"fullname": fullname},
+    )
 
 
 def createUserDict(member):
-    entry = {}
-    entry["id"] = member.id
-    entry["email"] = member.getProperty("email")
-    fullname = member.getProperty("fullname")
-    entry["firstName"] = ""
-    entry["lastName"] = ""
-    if fullname:
-        parts = fullname.split(" ")
-        entry["lastName"] = parts[-1]
-        entry["firstName"] = " ".join(parts[:-1])
-    entry["attributes"] = {}
-    entry["groups"] = ["Member"]
-    return entry
+    fullname = (member.getProperty("fullname") or "").strip()
+    parts = fullname.split()
+    return {
+        "id": member.id,
+        "email": member.getProperty("email"),
+        "firstName": " ".join(parts[:-1]) if len(parts) > 1 else "",
+        "lastName": parts[-1] if parts else "",
+        "attributes": {},
+        "groups": ["Member"],
+    }
 
 
-@implementer(IPublishTraverse)
-class Health(Service):
-    """endpoint: /health GET Services"""
-
+class KeyCloakService(Service):
     def __init__(self, context, request):
-        super().__init__(context, request)
+        self.context = context
+        self.request = request
         self.params = []
 
     def publishTraverse(self, request, name):
         self.params.append(name)
         return self
 
-    def render(self):
-        print("Health-Check")
+    def json_response(self, payload, status=200):
+        self.request.response.setStatus(status)
+        self.request.response.setHeader("Content-Type", "application/json")
+        return json.dumps(payload)
+
+    def error(self, status, message):
+        return self.json_response({"message": message}, status)
+
+    def read_json(self):
+        body = self.request.get("BODY")
+        if not isinstance(body, bytes) or not body:
+            raise ValueError("A JSON request body is required.")
         try:
-            return
-        except:
-            message = "Fehler"
-            self.request.response.setStatus(503)
-            return {"message": message}
+            payload = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("The request body is not valid JSON.") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("The JSON request body must be an object.")
+        return payload
+
+    def require_single_id(self):
+        if len(self.params) != 1 or not self.params[0]:
+            raise ValueError("Exactly one user ID is required in the path.")
+        return self.params[0]
 
 
 @implementer(IPublishTraverse)
-class KeyCloakUsers(Service):
-    """endpoint: /users GET Services"""
-
-    def __init__(self, context, request):
-        super().__init__(context, request)
-        self.params = []
-
-    def publishTraverse(self, request, name):
-        self.params.append(name)
-        return self
+class Health(KeyCloakService):
+    """Endpoint: GET /health."""
 
     def render(self):
-        print("KeyCloakUsers")
+        return self.json_response({"status": "ok"})
+
+
+@implementer(IPublishTraverse)
+class KeyCloakUsers(KeyCloakService):
+    """Endpoint: GET /users."""
+
+    def render(self):
         if not self.params:
-            print("ListUsers")
-            retlist = []
-            memberlist = api.user.get_users()
-            first = self.request.get("first")
-            if not first:
-                first = 0
-            maxuser = self.request.get("max")
-            if not maxuser:
-                maxuser = 0
-            for i in memberlist:
-                retlist.append(createUserDict(i))
-            retlist = retlist[int(first) :]
-            if int(maxuser) > 0:
-                retlist = retlist[: int(maxuser)]
-            return json.dumps(retlist)
-        elif "count" in self.params:
-            retobj = {"count": 0}
-            memberlist = api.user.get_users()
-            retobj["count"] = len(memberlist)
-            return json.dumps(retobj)
-        elif "email" in self.params:
-            memberdict = {}
-            email = self.params[-1]
-            memberlist = api.user.get_users()
-            for i in memberlist:
-                if email == i.getProperty("email"):
-                    return json.dumps(createUserDict(i))
-            self.request.response.setStatus(401)
-            return json.dumps(memberdict)
-        else:
-            memberdict = {}
-            uid = self.params[0]
-            member = api.user.get(userid=uid)
+            try:
+                first = self._pagination_value("first", 0, MAX_OFFSET)
+                maxuser = self._pagination_value("max", 0, MAX_PAGE_SIZE)
+            except ValueError as exc:
+                return self.error(400, str(exc))
+            users = [createUserDict(member) for member in api.user.get_users()]
+            users = users[first:]
+            if maxuser:
+                users = users[:maxuser]
+            return self.json_response(users)
+
+        if self.params == ["count"]:
+            return self.json_response({"count": len(api.user.get_users())})
+
+        if len(self.params) == 2 and self.params[0] == "email":
+            email = self.params[1]
+            for member in api.user.get_users():
+                if email == member.getProperty("email"):
+                    return self.json_response(createUserDict(member))
+            return self.error(404, "User not found.")
+
+        if len(self.params) == 1:
+            member = api.user.get(userid=self.params[0])
             if member:
-                return json.dumps(createUserDict(member))
-            self.request.response.setStatus(401)
-            return json.dumps(memberdict)
+                return self.json_response(createUserDict(member))
+            return self.error(404, "User not found.")
+
+        return self.error(400, "Invalid user lookup path.")
+
+    def _pagination_value(self, name, default, maximum):
+        value = self.request.get(name)
+        if value in (None, ""):
+            return default
+        try:
+            value = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{name} must be a non-negative integer.") from exc
+        if value < 0 or value > maximum:
+            raise ValueError(f"{name} must be between 0 and {maximum}.")
+        return value
 
 
 @implementer(IPublishTraverse)
-class KeyCloakCreateUser(Service):
-    """endpoint: /users POST Service"""
-
-    def __init__(self, context, request):
-        super().__init__(context, request)
-        self.params = []
-
-    def publishTraverse(self, request, name):
-        self.params.append(name)
-        return self
+class KeyCloakCreateUser(KeyCloakService):
+    """Endpoint: POST /users."""
 
     def render(self):
-        print("createuser")
-        body = self.request.get("BODY")
-        decoded_body = body.decode("utf-8")
-        userdict = json.loads(decoded_body)
-        uid = userdict.get("id")
-        pw = "e$7UwQ5xO*5p"  # Initialpassword für neue Benutzer
-        email = "john.doe@dummy.de"
-        fullname = "John Doe"
-        if not api.user.get(uid):
-            user = createUser(uid, pw, email, fullname)
-            if user:
-                print("New User created")
-                self.request.response.setStatus(204)
-            else:
-                print("Error while user creation")
-                self.request.response.setStatus(401)
-            return
-        print("Error while user already exists")
-        self.request.response.setStatus(401)
-        return
+        try:
+            payload = self.read_json()
+        except ValueError as exc:
+            return self.error(400, str(exc))
+
+        uid = payload.get("id")
+        if not isinstance(uid, str) or not uid.strip():
+            return self.error(400, "id must be a non-empty string.")
+        uid = uid.strip()
+        if api.user.get(userid=uid):
+            return self.error(409, "User already exists.")
+
+        email = payload.get("email", "john.doe@dummy.de")
+        first_name = payload.get("firstName", "John")
+        last_name = payload.get("lastName", "Doe")
+        if not all(isinstance(value, str) for value in (email, first_name, last_name)):
+            return self.error(400, "email and name fields must be strings.")
+        fullname = f"{first_name} {last_name}".strip()
+
+        try:
+            createUser(uid, secrets.token_urlsafe(32), email, fullname)
+        except Exception:
+            logger.exception("Unable to create Keycloak user %r", uid)
+            return self.error(500, "User creation failed.")
+        self.request.response.setStatus(204)
+        return None
 
 
 @implementer(IPublishTraverse)
-class KeyCloakUpdateUser(Service):
-    """endpoint: /users PUT Service"""
-
-    def __init__(self, context, request):
-        super().__init__(context, request)
-        self.params = []
-
-    def publishTraverse(self, request, name):
-        self.params.append(name)
-        return self
+class KeyCloakUpdateUser(KeyCloakService):
+    """Endpoint: PUT /users/{id}."""
 
     def render(self):
-        print("updateuser")
-        body = self.request.get("BODY")
-        decoded_body = body.decode("utf-8")
-        userdict = json.loads(decoded_body)
-        uid = userdict.get("id")
-        if self.params[0] != uid:
-            print("User-Ids in request and body are not the same")
-            self.request.response.setStatus(401)
-            return
-        email = userdict.get("email")
-        fullname = f"{userdict.get('firstName')} {userdict.get('lastName')}"
-        pm = getToolByName(self, "portal_membership")
+        try:
+            uid = self.require_single_id()
+            payload = self.read_json()
+        except ValueError as exc:
+            return self.error(400, str(exc))
+
+        if payload.get("id") != uid:
+            return self.error(400, "Path and body user IDs must match.")
+        email = payload.get("email")
+        first_name = payload.get("firstName")
+        last_name = payload.get("lastName")
+        if not all(isinstance(value, str) for value in (email, first_name, last_name)):
+            return self.error(
+                400, "email, firstName and lastName are required strings."
+            )
+
+        pm = getToolByName(self.context, "portal_membership")
         member = pm.getMemberById(uid)
         if not member:
-            print("Member doesn't exist")
-            self.request.response.setStatus(401)
-            return
-        mapping = {"email": email, "fullname": fullname}
+            return self.error(404, "User not found.")
         try:
-            member.setMemberProperties(mapping=mapping)
-            self.request.response.setStatus(204)
-        except:
-            print("Error while user update")
-            self.request.response.setStatus(401)
-        return
-
-
-@implementer(IPublishTraverse)
-class KeyCloakDeleteUser(Service):
-    """endpoint: /users DELETE Service"""
-
-    def __init__(self, context, request):
-        super().__init__(context, request)
-        self.params = []
-
-    def publishTraverse(self, request, name):
-        self.params.append(name)
-        return self
-
-    def render(self):
-        print("deleteuser")
-        if not self.params:
-            print("No param in request")
-            self.request.response.setStatus(401)
-            return
-        uid = self.params[0]
-        user = api.user.get(username=uid)
-        if not user:
-            print("User not found")
-            self.request.response.setStatus(404)
-            return
-        try:
-            api.user.delete(username=uid)
-            print("User successfully deleted")
-            self.request.response.setStatus(404)
-            return
-        except:
-            print("Error while delete user")
-            self.request.response.setStatus(401)
-            return
-
-
-@implementer(IPublishTraverse)
-class KeyCloakCredentials(Service):
-    """endpoint: /credentials POST Service"""
-
-    def __init__(self, context, request):
-        super().__init__(context, request)
-        self.params = []
-
-    def publishTraverse(self, request, name):
-        self.params.append(name)
-        return self
-
-    def render(self):
-        print("credentials")
-        if not self.params:
-            self.request.response.setStatus(400)
-            print("No userid in request")
-            return
-        uid = self.params[0]
-        if not api.user.get(uid):
-            print(
-                "Submitted credential could not have been verified with given userId."
+            member.setMemberProperties(
+                mapping={
+                    "email": email,
+                    "fullname": f"{first_name} {last_name}".strip(),
+                }
             )
-            self.request.response.setStatus(400)
-            return
-        uf = getToolByName(self, "acl_users")
-        body = self.request.get("BODY")
-        decoded_body = body.decode("utf-8")
-        pw = json.loads(decoded_body).get("value")
-        if uf.authenticate(uid, pw, self.request):
-            self.request.response.setStatus(204)
-            response = self.request.response
-            response.setBody(uid)
-            return
-        print("#/components/responses/UnauthorizedError")
-        self.request.response.setStatus(401)
-        return
+        except Exception:
+            logger.exception("Unable to update Keycloak user %r", uid)
+            return self.error(500, "User update failed.")
+        self.request.response.setStatus(204)
+        return None
 
 
 @implementer(IPublishTraverse)
-class KeyCloakUpdateCredentials(Service):
-    """endpoint: /credentials PUT Service"""
-
-    def __init__(self, context, request):
-        super().__init__(context, request)
-        self.params = []
-
-    def publishTraverse(self, request, name):
-        self.params.append(name)
-        return self
+class KeyCloakDeleteUser(KeyCloakService):
+    """Endpoint: DELETE /users/{id}."""
 
     def render(self):
-        print("update_credentials")
-        if not self.params:
-            self.request.response.setStatus(400)
-            print("No UserID in request")
-            return
-        uid = self.params[0]
-        body = self.request.get("BODY")
-        decoded_body = body.decode("utf-8")
-        pw = json.loads(decoded_body).get("value")
-        if not api.user.get(uid):
-            member = createUser(uid, pw)
-            print("New User created")
-            self.request.response.setStatus(204)
-            return
-        pm = getToolByName(self, "portal_membership")
-        member = pm.getMemberById(uid)
         try:
-            member.setSecurityProfile(password=pw)
-            print("Update Password successful")
-        except:
-            print("Authentication information is missing or invalid")
-            self.request.response.setStatus(401)
-            return
+            uid = self.require_single_id()
+        except ValueError as exc:
+            return self.error(400, str(exc))
+        existing_user = api.user.get(userid=uid)
+        if not existing_user:
+            return self.error(404, "User not found.")
+        try:
+            api.user.delete(user=existing_user)
+        except Exception:
+            logger.exception("Unable to delete Keycloak user %r", uid)
+            return self.error(500, "User deletion failed.")
         self.request.response.setStatus(204)
-        response = self.request.response
-        response.setBody(uid)
-        return
+        return None
+
+
+@implementer(IPublishTraverse)
+class KeyCloakCredentials(KeyCloakService):
+    """Endpoint: POST /credentials/{id}."""
+
+    def render(self):
+        try:
+            uid = self.require_single_id()
+            payload = self.read_json()
+        except ValueError as exc:
+            return self.error(400, str(exc))
+        password = payload.get("value")
+        if not isinstance(password, str) or not password:
+            return self.error(400, "value must be a non-empty string.")
+
+        member = api.user.get(userid=uid)
+        if member:
+            uf = getToolByName(self.context, "acl_users")
+            if uf.authenticate(uid, password, self.request):
+                self.request.response.setStatus(204)
+                return None
+        return self.error(401, "Invalid user ID or credential.")
+
+
+@implementer(IPublishTraverse)
+class KeyCloakUpdateCredentials(KeyCloakService):
+    """Endpoint: PUT /credentials/{id}."""
+
+    def render(self):
+        try:
+            uid = self.require_single_id()
+            payload = self.read_json()
+        except ValueError as exc:
+            return self.error(400, str(exc))
+        password = payload.get("value")
+        if not isinstance(password, str) or not password:
+            return self.error(400, "value must be a non-empty string.")
+
+        member = api.user.get(userid=uid)
+        try:
+            if not member:
+                createUser(uid, password)
+            else:
+                member.setSecurityProfile(password=password)
+        except Exception:
+            logger.exception("Unable to update credentials for %r", uid)
+            return self.error(500, "Credential update failed.")
+        self.request.response.setStatus(204)
+        return None

@@ -8,9 +8,9 @@ class TestSetupInstall:
 
     def test_browserlayer(self, browser_layers):
         """Test that IBrowserLayer is registered."""
-        from nva.keycloak.interfaces import IBrowserLayer
+        from nva.keycloak.interfaces import INvaKeycloakLayer
 
-        assert IBrowserLayer in browser_layers
+        assert INvaKeycloakLayer in browser_layers
 
     def test_latest_version(self, profile_last_version):
         """Test latest version of default profile."""
