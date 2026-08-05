@@ -2,10 +2,14 @@
     xmlns="http://namespaces.zope.org/zope"
     xmlns:browser="http://namespaces.zope.org/browser"
     xmlns:plone="http://namespaces.plone.org/plone"
-    i18n_domain="nva.keycloak">
+    i18n_domain="nva.keycloak"
+    >
 
   <!-- Set overrides folder for Just-a-Bunch-Of-Templates product -->
-  <include package="z3c.jbot" file="meta.zcml" />
+  <include
+      package="z3c.jbot"
+      file="meta.zcml"
+      />
   <browser:jbot
       directory="overrides"
       layer="nva.keycloak.interfaces.INvaKeycloakLayer"
@@ -13,65 +17,65 @@
 
   <!-- Publish static files -->
   <plone:static
+      directory="static"
       name="nva.keycloak"
       type="plone"
-      directory="static"
       />
 
   <plone:service
-    method="GET"
-    factory=".service.Health"
-    for="plone.base.interfaces.IPloneSiteRoot"
-    permission="zope2.View"
-    name="health"
-    />
+      method="GET"
+      factory=".service.Health"
+      for="plone.base.interfaces.IPloneSiteRoot"
+      permission="zope2.View"
+      name="health"
+      />
 
   <plone:service
-    method="GET"
-    for="plone.base.interfaces.IPloneSiteRoot"
-    factory=".service.KeyCloakUsers"
-    permission="zope2.View"
-    name="users"
-    />
+      method="GET"
+      factory=".service.KeyCloakUsers"
+      for="plone.base.interfaces.IPloneSiteRoot"
+      permission="zope2.View"
+      name="users"
+      />
 
   <plone:service
-    method="POST"
-    for="plone.base.interfaces.IPloneSiteRoot"
-    factory=".service.KeyCloakCreateUser"
-    permission="zope2.View"
-    name="users"
-    />
+      method="POST"
+      factory=".service.KeyCloakCreateUser"
+      for="plone.base.interfaces.IPloneSiteRoot"
+      permission="zope2.View"
+      name="users"
+      />
 
   <plone:service
-    method="PUT"
-    for="plone.base.interfaces.IPloneSiteRoot"
-    factory=".service.KeyCloakUpdateUser"
-    permission="zope2.View"
-    name="users"
-    />  
+      method="PUT"
+      factory=".service.KeyCloakUpdateUser"
+      for="plone.base.interfaces.IPloneSiteRoot"
+      permission="zope2.View"
+      name="users"
+      />
 
   <plone:service
-    method="DELETE"
-    for="plone.base.interfaces.IPloneSiteRoot"
-    factory=".service.KeyCloakDeleteUser"
-    permission="zope2.View"
-    name="users"
-    />
+      method="DELETE"
+      factory=".service.KeyCloakDeleteUser"
+      for="plone.base.interfaces.IPloneSiteRoot"
+      permission="zope2.View"
+      name="users"
+      />
 
   <plone:service
-    method="POST"
-    for="plone.base.interfaces.IPloneSiteRoot"
-    factory=".service.KeyCloakCredentials"
-    permission="zope2.View"
-    name="credentials"
-    />
+      method="POST"
+      factory=".service.KeyCloakCredentials"
+      for="plone.base.interfaces.IPloneSiteRoot"
+      permission="zope2.View"
+      name="credentials"
+      />
 
   <plone:service
-    method="PUT"
-    for="plone.base.interfaces.IPloneSiteRoot"
-    factory=".service.KeyCloakUpdateCredentials"
-    permission="zope2.View"
-    name="credentials"
-    />
+      method="PUT"
+      factory=".service.KeyCloakUpdateCredentials"
+      for="plone.base.interfaces.IPloneSiteRoot"
+      permission="zope2.View"
+      name="credentials"
+      />
 
 </configure>

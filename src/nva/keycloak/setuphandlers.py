@@ -1,15 +1,13 @@
-# -*- coding: utf-8 -*-
 from plone.base.interfaces.installable import INonInstallable
 from zope.interface import implementer
 
 
 @implementer(INonInstallable)
-class HiddenProfiles(object):
-
+class HiddenProfiles:
     def getNonInstallableProfiles(self):
         """Hide uninstall profile from site-creation and quickinstaller."""
         return [
-            'nva.keycloak:uninstall',
+            "nva.keycloak:uninstall",
         ]
 
 

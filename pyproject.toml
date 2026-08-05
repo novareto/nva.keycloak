@@ -118,6 +118,7 @@ showcontent = true
 target-version = "py310"
 line-length = 88
 fix = true
+exclude = ["src/nva/keycloak/locales"]
 lint.select = [
     # flake8-2020
     "YTT",
