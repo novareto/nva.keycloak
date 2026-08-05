@@ -21,14 +21,14 @@
   <plone:service
     method="GET"
     factory=".service.Health"
-    for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+    for="plone.base.interfaces.IPloneSiteRoot"
     permission="zope2.View"
     name="health"
     />
 
   <plone:service
     method="GET"
-    for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+    for="plone.base.interfaces.IPloneSiteRoot"
     factory=".service.KeyCloakUsers"
     permission="zope2.View"
     name="users"
@@ -36,7 +36,7 @@
 
   <plone:service
     method="POST"
-    for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+    for="plone.base.interfaces.IPloneSiteRoot"
     factory=".service.KeyCloakCreateUser"
     permission="zope2.View"
     name="users"
@@ -44,7 +44,7 @@
 
   <plone:service
     method="PUT"
-    for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+    for="plone.base.interfaces.IPloneSiteRoot"
     factory=".service.KeyCloakUpdateUser"
     permission="zope2.View"
     name="users"
@@ -52,7 +52,7 @@
 
   <plone:service
     method="DELETE"
-    for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+    for="plone.base.interfaces.IPloneSiteRoot"
     factory=".service.KeyCloakDeleteUser"
     permission="zope2.View"
     name="users"
@@ -60,7 +60,7 @@
 
   <plone:service
     method="POST"
-    for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+    for="plone.base.interfaces.IPloneSiteRoot"
     factory=".service.KeyCloakCredentials"
     permission="zope2.View"
     name="credentials"
@@ -68,7 +68,7 @@
 
   <plone:service
     method="PUT"
-    for="Products.CMFPlone.interfaces.IPloneSiteRoot"
+    for="plone.base.interfaces.IPloneSiteRoot"
     factory=".service.KeyCloakUpdateCredentials"
     permission="zope2.View"
     name="credentials"
