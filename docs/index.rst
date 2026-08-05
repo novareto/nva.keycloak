@@ -1,5 +1,0 @@
-============
-nva.keycloak
-============
-
-User documentation
